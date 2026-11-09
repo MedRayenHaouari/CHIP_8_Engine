@@ -1,60 +1,44 @@
 # CHIP-8-ENGINE
 
-A high-performance, flexible, single-header (`stb`-style), library independent CHIP-8 core and testing platform written in C.
+A high-performance, flexible, zero-dependency, single-header (`stb`-style) CHIP-8 engine written in pure C. Designed from the ground up for both desktop environments and bare-metal embedded systems (such as ARM Cortex-M and RISC-V microcontrollers).
 
-## Downloads
-
-* **To download the core.h file**
-```bash
-wget https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h
-```
-
-* **To download the whole program**
-```bash
-git clone https://github.com/MedRayenHaouari/CHIP-8-ENGINE.git
-```
-* **NOTE:** The program depend on raylib for rendering and sound
+---
 
 ## Features
 
-* **Single-Header (`stb`-style) Integration:** Drop `chip8.h` into your project and define the implementation in a single translation unit.
-* **Dual Architecture Modes:** Switch between **Legacy** (original 1970s VIP quirks for vintage ROM compatibility) and **Modern** execution semantics.
-* **Scalable Performance Profiles:** 
-  * `FAST`: Utilizes speed optimizations and pre-computed lookup tables (`LUT`) for accelerated rendering.
-  * `SMALL`: Minimizes memory footprint with a compact 1-bit-per-pixel layout and many memory optimizations.
-  * `DEFAULT`: Balanced performance and standard pixel buffers.
+* **Header-Only (`stb`-style):** Easy integration into any project with a single `#include`.
+* **Zero Dependencies:** Completely independent of external runtime libraries.
+* **Dual Architecture Support:** Toggle between legacy (Cosmac VIP) and modern CHIP-8 instruction behaviors via compile-time flags.
+* **Flexible Display Pipelines:** 
+  * Default 32-bit RGBA / ARGB framebuffers.
+  * **1BPP Mode (`CHIP8_1BPP`):** Ultra-lightweight 256-byte VRAM layout designed for monochrome embedded displays.
+* **Embedded-Optimized:** 
+  * `CHIP8_FORCE_ALIGNEMENT` for strict memory alignment architectures (ARM, RISC-V).
+  * `CHIP8_NO_DIVISION` path for processors lacking hardware division support.
 
-## Getting Started
+---
 
-### Option1:
-In one of your C source files, define the implementation macro and your configuration flags before including the header:
+## Download
 
-```c
-#define CHIP8_IMPLEMENTATION // for chip 8 implementation (functions)
-#define CHIP8_MODERN // Or define CHIP8_LEGACY depending on your target ROMs
-#define FAST         // Optional: Enable high-performance lookup table mode or you can choose the SMALL flag for a small binary size and usage
-
-#include "chip8.h"
+* **To download the header file directly:**
+```bash
+wget [https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h](https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h)* **To download the header file directly:**
 ```
 
-### Option2:
+* **To clone the whole repo:**
+```bash
+wget [https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h](https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h)
+```
 
-Configure your build using preprocessor definitions to shape the engine to your target environment:
+---
 
-* **Architectures:**
-  * `-DCHIP8_MODERN`: Enables modern shift, bitwise, jump offset, and index register behaviors.
-  * `-DCHIP8_LEGACY`: Restores legacy hardware behaviors.
-* **Performance Optimizations: (Optional)**
-  * `-DFAST`: Enables fast rendering optimizations via pre-calculated lookup tables and more.
-  * `-DSMALL`: Compacts video RAM allocation for constrained systems.
-
-## Project Structure
-
-* `core/chip8.h` — The core single-header CHIP-8 engine
-* `include/` — Contains costum libraries for personalized types, color and symbols to use when printing to console
-* `platform/` — Contains main program where you can run Chip 8 ROMs using the engine
-* `build.sh` — For building the full program. Flags must be provided
-
-## License
-
-This project is open-source and available under the MIT License.
+* **Compilation flags**
+| Flag | Description |
+| :--- | :--- |
+| `#define CHIP8_MODERN` | (\*) Emulates modern CHIP-8 instruction standards. |
+| `#define CHIP8_LEGACY` | (\*) Emulates original COSMAC VIP behavior. |
+| `#define CHIP8_IMPLEMENTATION` | Compiles the function definitions. |
+| `#define CHIP8_1BPP` | Shrinks VRAM down to 256 bytes for 1-bit-per-pixel monochrome rendering. |
+| `#define CHIP8_ARGB` | Configures 32-bit color output to ARGB8888 order instead of the default RGBA. |
+| `#define CHIP8_FORCE_ALIGNEMENT` | Aligns internal buffers for strict architectures. |
+| `#define CHIP8_NO_DIVISION` | Uses subtraction loops instead of division instructions for architectures with no division. |
