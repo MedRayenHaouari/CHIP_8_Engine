@@ -1,15 +1,23 @@
 /*
 ** ############### CHIP 8 ENGINE ###############
 **
-** NOTES:
-** - It's advised to have your chip8 object to be allocated on the heap or to reside on .data segment because
-**   it contains aligned arrays that can realign the stack and cause some bugs and also because of its big size
+** IMPORTANT:
+** - When dealing with buffer use the chip8_string8_t type defined below!!!
+** - The loaded ROM must be less than 3500 mB.
 **
-**
+** NOTE: One of these must be sepcified
 ** - CHIP8_LEGACY flag is for emulating the COSMAC VIP
 ** - CHIP8_MODERN flag is for emulating the modern CHIP 8 
+**
+** - CHIP8_IMPLEMENTATION flag to get the functions implementions 
+** - CHIP8_FORCE_ALIGNEMENT can be used to force array's alignement (useful for ARM and RISCV arch) and therefore the chip8
+**   struct must be allocated in the heap to avoid bugs.
+** - CHIP8_1BPP flag can be used to obtain a 1bpp vram maybe useful when using a monochronous screen in an embedded project
+**   who knows!!
+** - CHIP8_ARGB flag can be used to get an ARGB vram values in the default 4 bytes per pixel mode (if not specified
+**   the vram will have RGBA kind of values)
+** - CHIP8_NO_DIVISION flag used when you're using an arch that don't support one
 */
-
 
 
 
@@ -34,52 +42,48 @@ typedef uint64_t u64;
 typedef int64_t i64;
 
 
-
-
-
 #if (!defined(CHIP8_LEGACY) && !defined(CHIP8_MODERN))
 #  error "You have to specify whether you wanna run legacy or modern chip 8 engine, one of them"
 #elif (defined(CHIP8_LEGACY) && defined(CHIP8_MODERN))
 #  error "You have to specify you either want legacy or modern chip 8 engine not both"
 #endif
 
-#ifdef CHIP8_INLINE
-#  if defined(__clang__) || defined(__GNUC__)
-#    define INLINE __attribute__((always_inline))
-#  elif defined(_MSC_VER)
-#    define INLINE __forceinline
-#  else
-#    define INLINE
+#if CHIP8_FORCE_ALIGNEMENT
+#  if defined(_MSC_VER)
+#    define CHIP8_ALIGN(n) __declspec(align(n))
+#  elif defined(__clang__) || defined(__GNUC__)
+#    define CHIP8_ALIGN(n) __attribute__((aligned(n)))
 #  endif
-#else
-#  define INLINE
-#endif
-
-#if defined(_MSC_VER)
-#  define CHIP8_ALIGN(n) __declspec(align(n))
-#elif defined(__clang__) || defined(__GNUC__)
-#  define CHIP8_ALIGN(n) __attribute__((aligned(n)))
 #else
 #  define CHIP8_ALIGN(n)
 #endif
 
-#define MAX_ROM_SIZE 3584
-
-#if defined(CHIP8_1BPP) // 1 bit per pixel
-# define VRAM_SIZE 256
+#if defined(__clang__) || defined(__GNU__)
+    #define CHIP8_MEMSET(dest, val, size) __builtin_memset(dest, val, size)
 #else
-# define VRAM_SIZE 8192
+#   define CHIP8_MEMSET(dest, val, size)\
+    do{\
+      int j;\
+      for (j=0;j<size;j++){\
+        dest[j] = val;\
+      }\
+    }while(0)
 #endif
 
-#define RAM_SIZE 4096
+#define CHIP8_MAX_ROM_SIZE 3500
 
+#if defined(CHIP8_1BPP) // 1 bit per pixel
+# define CHIP8_VRAM_SIZE 256
+#else
+# define CHIP8_VRAM_SIZE 8192
+#endif
 
-
+#define CHIP8_RAM_SIZE 4096
 
 
 typedef struct{
-    u8 ram[RAM_SIZE] CHIP8_ALIGN(sizeof(size_t)); // RAM slot
-    u8 vram[VRAM_SIZE] CHIP8_ALIGN(sizeof(size_t)); // VRAM slot
+    u8 ram[CHIP8_RAM_SIZE] CHIP8_ALIGN(sizeof(size_t)); // RAM slot
+    u8 vram[CHIP8_VRAM_SIZE] CHIP8_ALIGN(sizeof(size_t)); // VRAM slot
     u8 v[16] CHIP8_ALIGN(sizeof(size_t));  // general purpose Vx registers
     u16 key;  // keyboard keys with LSB at index 0
     u16 i;  // the 16bit I register
@@ -104,10 +108,7 @@ int chip8_init(chip8 *chip,u8 rand);
 int chip8_load_rom(chip8 *chip,chip8_string8_t rom);
 int chip8_run(chip8 *chip);
 int chip8_copy_vram(chip8 *chip,chip8_string8_t *pixel_buffer);
-int chip8_unpack_vram(chip8 *chip,chip8_string8_t *pixel_buffer);
-
-
-
+int chip8_unpack_1bpp_vram(chip8 *chip,chip8_string8_t *pixel_buffer);
 
 
 #if defined(CHIP8_IMPLEMENTATION)
@@ -117,18 +118,31 @@ int chip8_init(chip8 *chip,u8 rand){
   // initializing the RAM
   i16 i;
   u8 *chunck = chip->ram;
-  for (i=0;i<RAM_SIZE;i++){
-    chunck[i] = 0;
-  }
+  CHIP8_MEMSET(chunck,0,CHIP8_RAM_SIZE);
   
   // initializing the VRAM
+  #if defined(CHIP8_1BPP)
   chunck = chip->vram;
-  for (i=0;i<VRAM_SIZE;i++){
-    chunck[i] = 0;
+  CHIP8_MEMSET(chunck,0,CHIP8_VRAM_SIZE);
+  #else
+  #if defined(CHIP8_ARGB)
+  chunck = chip->vram;
+  CHIP8_MEMSET(chunck,0,CHIP8_VRAM_SIZE);
+  for (i=0;i<CHIP8_VRAM_SIZE;i=i+4){
+      chip->vram[i] = 0xFF;
   }
+  #else
+  chunck = chip->vram;
+  CHIP8_MEMSET(chunck,0,CHIP8_VRAM_SIZE);
+  for (i=3;i<CHIP8_VRAM_SIZE;i=i+4){
+      chip->vram[i] = 0xFF;
+  }
+  #endif
+  #endif
   
   // writing 0 to F sprites to RAM starting from @ 0
-  u8 sprites[80] = {
+  // this array definition is AI generated
+  static u8 chip8_sprites[80] = {
       0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
       0x20, 0x60, 0x20, 0x20, 0x70, // 1
       0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -147,14 +161,11 @@ int chip8_init(chip8 *chip,u8 rand){
       0xF0, 0x80, 0xF0, 0x80, 0x80  // F
   };
   for (i=0;i<80;i++){
-    chip->ram[i] = sprites[i];
+    chip->ram[i] = chip8_sprites[i];
   }
   
   // initializing the Registers
-  chunck = chip->v;
-  for (i=0;i<16;i++){
-    chunck[i] = 0;
-  }
+  CHIP8_MEMSET(chip->v,0,16);
   
   // initializing other variables
   chip->pc = 0x200;
@@ -168,12 +179,9 @@ int chip8_init(chip8 *chip,u8 rand){
 }
 
 
-
-
-
 // load ROM data to the chip's RAM starting from offset 0x200
 int chip8_load_rom(chip8 *chip,chip8_string8_t rom){
-  if (chip == NULL || rom.size > MAX_ROM_SIZE) return -1;
+  if (chip == NULL || rom.size > CHIP8_MAX_ROM_SIZE) return -1;
   size_t i;
   for (i=0;i<rom.size;i++){
     chip->ram[i+0x200] = rom.data[i];
@@ -182,11 +190,8 @@ int chip8_load_rom(chip8 *chip,chip8_string8_t rom){
 }
 
 
-
-
-// NOTE: to improve (add some data from the chip as seeds)
 // a pseudo u8 number generator from the chip random variable
-static inline INLINE u8 chip8_random_byte(chip8 *chip){
+static inline u8 chip8_random_byte(chip8 *chip){
   u8 seed = chip->rand;
   if (seed == 0) seed = (u8)0xAD; // some random ahh number
   int x = seed ^ chip->ram[seed + 0x200]; // & for modulo so that it never exceds RAM_SIZE and be above 0x200
@@ -200,10 +205,8 @@ static inline INLINE u8 chip8_random_byte(chip8 *chip){
 }
 
 
-
-
 // count tailing zero in a u16 integer
-static inline INLINE u8 chip8_ctz16(u16 x) {
+static inline u8 chip8_ctz16(u16 x) {
     u8 i = 0;
     while ((x & 1) == 0 && i<16) {
         x >>= 1;
@@ -211,9 +214,6 @@ static inline INLINE u8 chip8_ctz16(u16 x) {
     }
     return i;
 }
-
-
-
 
 
 // the main execution loop
@@ -230,6 +230,8 @@ int chip8_run(chip8 *chip){
   u8 c = (inst & 0x00F0) >> 4;
   u8 d = inst & 0x000F;
   chip->pc += 2;
+
+// this switch is AI generated
   switch (a){
     case 0: goto label_0;
     case 1: goto label_1;
@@ -254,9 +256,7 @@ int chip8_run(chip8 *chip){
     if (b == 0 && c == 0xE && d == 0){
       int i;
       u8 *chunck = chip->vram;
-      for (i=0;i<VRAM_SIZE;i++){
-        chunck[i] = 0;
-      }
+      CHIP8_MEMSET(chunck,0,CHIP8_VRAM_SIZE);
     }
     else if (b == 0 && c == 0xE && d == 0xE){
       if (chip->sp <= -1) return -1;
@@ -400,16 +400,55 @@ int chip8_run(chip8 *chip){
     return 0;
   }
 
-  // NOTE: i have to make it cleaner
-  // i highly optimized it if you wanna understand it try replacing these variables with their expressions
-  // i did this substitution sothat i access memory the least amount of times
-  // same note for SMALL and DEFAULT modes
   #if defined(CHIP8_1BPP)
   label_D:{
+    u8 collision = 0;
+    int i = chip->i;
+    u8 vx = chip->v[b];
+    u8 vy = chip->v[c];
+    u8 n = d;
+    u8 shift = vx%8;
+    u8 byte,slice1,slice2;
+    for (;i<chip->i+n;i++){
+      byte = chip->ram[i];
+      slice1 = byte >> shift;
+      slice2 = (shift > 0 ? byte << (8 - shift) : 0);
+      collision |= chip->vram[(vx/8)%8+vy*8] & slice1;
+      chip->vram[(vx/8)%8+vy*8] ^= slice1;
+      collision |= chip->vram[(vx/8+1)%8+vy*8] & slice2;
+      chip->vram[(vx/8+1)%8+vy*8] ^= slice2;
+      vy = (vy+1)%32;
+    }
+    chip->v[0xF] = (collision > 0);
     return 0;
   }
   #else
   label_D:{
+    u8 word,counter,byte;
+    u8 collision = 0;
+    int i = chip->i;
+    u8 vx = (chip->v[b])%64;
+    u8 vy = (chip->v[c])%32;
+    u8 n = d;
+    for (;i<chip->i + n; i++){
+      byte = chip->ram[i];
+      for (counter = 0;counter<8;counter++){
+        #if defined(CHIP8_ARGB)
+        word = ((byte >> (7-counter))&1)*0xFF;
+        collision |= chip->vram[((vx+counter)%64)*4 + vy*256 + 1] & word;
+        chip->vram[((vx+counter)%64)*4 + vy*256 + 1] ^= word;
+        chip->vram[((vx+counter)%64)*4 + vy*256 + 2] ^= word;
+        chip->vram[((vx+counter)%64)*4 + vy*256 + 3] ^= word;
+        #else
+        word = ((byte >> (7-counter))&1)*0xFF;
+        collision |= chip->vram[((vx+counter)%64)*4 + vy*256 + 1] & word;
+        chip->vram[((vx+counter)%64)*4 + vy*256 + 0] ^= word;
+        chip->vram[((vx+counter)%64)*4 + vy*256 + 1] ^= word;
+        chip->vram[((vx+counter)%64)*4 + vy*256 + 2] ^= word;
+        #endif
+      }
+      vy = (vy+1)%32;
+    } 
     return 0;
   }
   #endif
@@ -426,7 +465,6 @@ int chip8_run(chip8 *chip){
     }
   }
     
-  // about the 0x0A i have to remove __builtin_ctz for portability and maybe improve the logic
   label_F:{
     int a;  
     u8 x = (c << 4) | d;
@@ -486,7 +524,7 @@ int chip8_run(chip8 *chip){
         break;
       case 0x55:{
         a = chip->i;
-        if (a + b < RAM_SIZE){
+        if (a + b < CHIP8_RAM_SIZE){
           u8 *ram = chip->ram+a;
           u8 *reg = chip->v;
           for (int i=0;i<=b;i++){
@@ -500,7 +538,7 @@ int chip8_run(chip8 *chip){
       }
       case 0x65:{
         a = chip->i;
-        if (a + b < RAM_SIZE){
+        if (a + b < CHIP8_RAM_SIZE){
           u8 *ram = chip->ram+a;
           u8 *reg = chip->v;
           for (int i=0;i<=b;i++){
@@ -519,42 +557,43 @@ int chip8_run(chip8 *chip){
 }
 
 
-
-
-
 #if defined(CHIP8_1BPP)
 // unpack the 256B 1bpp vram into u32 pixel buffer
-int chip8_unpack_vram(chip8 *chip,chip8_string8_t *pixel_buffer){
-  if (chip == NULL || pixel_buffer == NULL || pixel_buffer->size < VRAM_SIZE*32 || pixel_buffer->data == NULL) return -1;
+int chip8_unpack_1bpp_vram(chip8 *chip,chip8_string8_t *pixel_buffer){
+  if (chip == NULL || pixel_buffer == NULL || pixel_buffer->size < CHIP8_VRAM_SIZE*32 || pixel_buffer->data == NULL) return -1;
   u8 *array = (u8*)pixel_buffer->data;
-  int i,index_i,index_j,index_k;
-  u8 byte,j,k,res;
-  for (i=0;i<=255;i++){
-    index_i = i*32;
+  u32 i;
+  u8 word,counter,byte;
+  for (i=0;i<256;i++){
     byte = chip->vram[i];
-    for (j=0;j<8;j++){
-      index_j = j*4;
-      res = (byte >> (7-j)) & 1 ? 0xFF : 0;
-      index_k = index_i + index_j;
-      for (k=0;k<3;k++){
-        array[index_k + k] = res;
-      }
-      array[index_k + 3] = 0xFF;
+    for (counter = 0;counter<8;counter++){
+      #if defined(CHIP8_ARGB)
+      word = ((byte >> (7-counter))&1)*0xFF;
+      array[i*32 + 0] = 0xFF;
+      array[i*32 + 1] = word;
+      array[i*32 + 2] = word;
+      array[i*32 + 3] = word;
+      #else
+      word = ((byte >> (7-counter))&1)*0xFF;
+      array[i*32 + 0] = word;
+      array[i*32 + 1] = word;
+      array[i*32 + 2] = word;
+      array[i*32 + 3] = 0xFF;
+      #endif
     }
-  }
+  } 
   return 0;
 }
 #endif
 
 
-
 // copy the containt of vram into pixel_buffer
 int chip8_copy_vram(chip8 *chip,chip8_string8_t *pixel_buffer){
-  if (chip == NULL || pixel_buffer == NULL || pixel_buffer->size < VRAM_SIZE || pixel_buffer->data == NULL) return -1;
+  if (chip == NULL || pixel_buffer == NULL || pixel_buffer->size < CHIP8_VRAM_SIZE || pixel_buffer->data == NULL) return -1;
   u8 *buffer = pixel_buffer->data;
   u8 *array = chip->vram;
   int i;
-  for (i=0;i<(VRAM_SIZE);i++){
+  for (i=0;i<(CHIP8_VRAM_SIZE);i++){
     buffer[i] = array[i];
   }
   return 0;
@@ -562,9 +601,9 @@ int chip8_copy_vram(chip8 *chip,chip8_string8_t *pixel_buffer){
 
 #endif // CHIP8_IMPLEMENTATION
 
-#undef INLINE
-#undef CHIP8_ALIGN
-
 #ifdef __cplusplus
 }
 #endif
+
+#undef CHIP8_ALIGN
+#undef CHIP8_MEMSET
