@@ -5,10 +5,7 @@
 ** - When dealing with buffer use the chip8_string8_t type defined below!!!
 ** - The loaded ROM must be less than 3500 mB.
 **
-** NOTE: One of these must be sepcified
 ** - CHIP8_LEGACY flag is for emulating the COSMAC VIP
-** - CHIP8_MODERN flag is for emulating the modern CHIP 8 
-**
 ** - CHIP8_IMPLEMENTATION flag to get the functions implementions 
 ** - CHIP8_FORCE_ALIGNEMENT can be used to force array's alignement (useful for ARM and RISCV arch) and therefore the chip8
 **   struct must be allocated in the heap to avoid bugs.
@@ -41,12 +38,6 @@ typedef int32_t i32;
 typedef uint64_t u64;
 typedef int64_t i64;
 
-
-#if (!defined(CHIP8_LEGACY) && !defined(CHIP8_MODERN))
-#  error "You have to specify whether you wanna run legacy or modern chip 8 engine, one of them"
-#elif (defined(CHIP8_LEGACY) && defined(CHIP8_MODERN))
-#  error "You have to specify you either want legacy or modern chip 8 engine not both"
-#endif
 
 #if CHIP8_FORCE_ALIGNEMENT
 #  if defined(_MSC_VER)
@@ -388,7 +379,7 @@ int chip8_run(chip8 *chip){
   label_B:{
     #if defined(CHIP8_LEGACY)
     chip->pc = ((b << 8) | (c << 4) | d) + chip->v[0];
-    #elif defined(CHIP8_MODERN)
+    #else
     chip->pc = ((b << 8) | (c << 4) | d) + chip->v[b];
     #endif
     return 0;

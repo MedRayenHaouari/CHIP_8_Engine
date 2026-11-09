@@ -22,21 +22,23 @@ A high-performance, flexible, zero-dependency, single-header (`stb`-style) CHIP-
 
 * **To download the header file directly:**
 ```bash
-wget [https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h](https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h)* **To download the header file directly:**
+wget https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h
 ```
 
 * **To clone the whole repo:**
 ```bash
-wget [https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h](https://raw.githubusercontent.com/MedRayenHaouari/CHIP-8-ENGINE/main/core/chip8.h)
+git clone https://github.com/MedRayenHaouari/CHIP-8-ENGINE.git
 ```
 
 ---
 
-* **Compilation flags**
+## Compilation Flags
+
+NOTE: without any flag, you'll end up with the default modern chip8 without function definition, without granted alignement and RGBA8888 VRAM.
+
 | Flag | Description |
 | :--- | :--- |
-| `#define CHIP8_MODERN` | (\*) Emulates modern CHIP-8 instruction standards. |
-| `#define CHIP8_LEGACY` | (\*) Emulates original COSMAC VIP behavior. |
+| `#define CHIP8_LEGACY` | Emulates original COSMAC VIP behavior. |
 | `#define CHIP8_IMPLEMENTATION` | Compiles the function definitions. |
 | `#define CHIP8_1BPP` | Shrinks VRAM down to 256 bytes for 1-bit-per-pixel monochrome rendering. |
 | `#define CHIP8_ARGB` | Configures 32-bit color output to ARGB8888 order instead of the default RGBA. |
